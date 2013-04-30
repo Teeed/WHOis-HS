@@ -1,0 +1,7 @@
+!.gitignore
+!sessions/.gitignore
+*.pyc
+*.pyo
+sessions/*
+database.db
+localconfig.cfg

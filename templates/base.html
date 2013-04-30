@@ -1,0 +1,13 @@
+$def with (content)
+<!DOCTYPE html>
+<html>
+<head>
+<title>WhoIS @ Hackerspace Kraków</title>
+
+$if content.has_key('head'):
+	$:content.head
+</head>
+<body>
+$:content
+</body>
+</html>

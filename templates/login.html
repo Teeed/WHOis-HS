@@ -1,0 +1,8 @@
+$def with (form, badlogin=False)
+
+$if badlogin:
+	<p>Zły login lub hasło</p>
+
+<form action="" method="POST">
+$:form.render()
+</form>
