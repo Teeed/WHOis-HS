@@ -61,12 +61,6 @@ def hash_password(username, password):
 def generate_access_key():
 	return ''.join(random.choice(string.ascii_lowercase + string.ascii_uppercase + string.digits) for x in range(10))
 
-def regenerate_user_access_key(userid):
-	key = generate_access_key()
-	db.query('UPDATE whois_users SET access_key = $access_key WHERE id = $id', vars={'access_key': key, 'id': userid})
-
-	return key
-
 def get_current_users():
 	# for testing only
 	# time.sleep(2)
@@ -176,7 +170,7 @@ class register_user:
 			del data['password2']
 			del data['submit']
 			data['password'] = sqlite3.Binary(hash_password(data['login'], data['password']))
-			data['registered_at'] = time.time()
+			data['registered_at'] = int(time.time())
 			data['access_key'] = generate_access_key()
 
 			session.user_id = db.insert('whois_users', **data)
@@ -295,7 +289,8 @@ class user_panel:
 			f.password.value = ''
 			return render.login(f, True)
 
-		regenerate_user_access_key(uid)
+		db.query('UPDATE whois_users SET last_login = strftime(\'%s\',\'now\'), access_key = $access_key WHERE id = $id', vars=
+			{'access_key': generate_access_key(), 'id': uid})
 	
 		session.user_id = uid
 
