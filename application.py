@@ -95,7 +95,7 @@ class who_is:
 				db.query('UPDATE whois_devices SET last_seen = strftime(\'%s\',\'now\') WHERE mac_addr IN $mac_list', vars=
 					{'mac_list': query_for})
 
-				results = db.query('SELECT display_name FROM whois_users WHERE id IN (SELECT user_id FROM whois_devices WHERE mac_addr IN ($macs))', vars=
+				results = db.query('SELECT display_name FROM whois_users WHERE id IN (SELECT user_id FROM whois_devices WHERE mac_addr IN $macs)', vars=
 					{'macs': query_for})
 
 				for user in results:
@@ -231,7 +231,6 @@ class user_edit_profile:
 			f.validators.append( unique_display_name_validator )
 			f.display_name.validators = [display_name_validator]
 
-
 		if not f.validates():
 			return render.editprofile(f)
 
@@ -245,7 +244,6 @@ class user_edit_profile:
 
 		if len(data_to_change.keys()) > 2: # if changing anything
 			db.update('whois_users', **data_to_change)
-
 
 		raise web.seeother('/panel')
 
