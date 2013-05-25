@@ -129,7 +129,7 @@ class who_is:
 				db.query('UPDATE whois_devices SET last_seen = strftime(\'%s\',\'now\') WHERE mac_addr IN $mac_list', vars=
 					{'mac_list': query_for})
 
-				results = db.query('SELECT display_name FROM whois_users WHERE id IN (SELECT user_id FROM whois_devices WHERE mac_addr IN $macs)', vars=
+				results = db.query('SELECT DISTINCT display_name FROM whois_users WHERE id IN (SELECT user_id FROM whois_devices WHERE mac_addr IN $macs)', vars=
 					{'macs': query_for})
 
 				for user in results:
