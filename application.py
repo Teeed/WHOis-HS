@@ -136,7 +136,7 @@ class who_is:
 					who_is.last_seen_list.append(user['display_name'])
 
 			who_is.last_seen_updated = int(time.time()) + 60*10
-			who_is.total_devices_count = len(query_for) - len(who_is.last_seen_list)
+			who_is.total_devices_count = len(query_for)
 
 		return json.dumps({'date': who_is.last_seen_updated, 'users': who_is.last_seen_list, 'total_devices_count': who_is.total_devices_count})
         
