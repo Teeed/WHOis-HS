@@ -114,6 +114,7 @@ def get_current_users():
 class who_is:
 	last_seen_updated = 0
 	last_seen_list = []
+	unknown_devices_count = 0
 
 	def GET(self):
 		web.header('Content-type', 'application/json')
@@ -135,8 +136,9 @@ class who_is:
 					who_is.last_seen_list.append(user['display_name'])
 
 			who_is.last_seen_updated = int(time.time()) + 60*10
+			who_is.unknown_devices_count = len(query_for) - len(who_is.last_seen_list)
 
-		return json.dumps({'date': who_is.last_seen_updated, 'users': who_is.last_seen_list})
+		return json.dumps({'date': who_is.last_seen_updated, 'users': who_is.last_seen_list, 'unknown_devices': who_is.unknown_devices_count})
         
 class register_device:
 	def GET(self, uid, access_key):
