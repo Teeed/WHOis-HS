@@ -123,7 +123,11 @@ class who_is:
 		if who_is.last_seen_updated < time.time():
 			dhcp_leases = get_current_users()
 			query_for = [sqlite3.Binary(lease[1]) for lease in dhcp_leases]
-			who_is.last_seen_list = []
+			
+			# no idea why DISTINCT does not work.. we will use set instead of list to prevent duplicates
+			# we will also display number of unregistered devices
+			# TODO: Fix this!
+			users = set([])
 
 			if len(dhcp_leases):
 				db.query('UPDATE whois_devices SET last_seen = strftime(\'%s\',\'now\') WHERE mac_addr IN $mac_list', vars=
@@ -133,10 +137,11 @@ class who_is:
 					{'macs': query_for})
 
 				for user in results:
-					who_is.last_seen_list.append(user['display_name'])
+					users.add(user['display_name'])
 
 			who_is.last_seen_updated = int(time.time()) + 60*10
 			who_is.total_devices_count = len(query_for)
+			who_is.last_seen_list = list(users)
 
 		return json.dumps({'date': who_is.last_seen_updated, 'users': who_is.last_seen_list, 'total_devices_count': who_is.total_devices_count})
         
