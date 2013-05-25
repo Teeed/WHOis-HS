@@ -66,15 +66,48 @@ def get_current_users():
 	# time.sleep(2)
 	# return [('127.0.0.1', mac_to_binary('AA:BB:CC:DD:EE:FF')), ('192.168.1.7', mac_to_binary('AA:BB:CC:DD:EE:F0')), ]
 
-	varlist = netsnmp.VarList(netsnmp.Varbind(config.get('snmp', 'tree')))
-	response = netsnmp.snmpwalk(varlist, DestHost=config.get('snmp', 'query_host'), Version=config.getint('snmp', 'version'), Community=config.get('snmp', 'community'), Timeout=config.getint('snmp', 'timeout'))
+	# final version will use this.. but.. this should work but it does not :(
+	# we will investigate it later
+	#varlist = netsnmp.VarList(netsnmp.Varbind(config.get('snmp', 'tree')))
+	#response = netsnmp.snmpwalk(varlist, DestHost=config.get('snmp', 'query_host'), Version=config.getint('snmp', 'version'), Community=config.get('snmp', 'community'), Timeout=config.getint('snmp', 'timeout'))
 
+	#users = []
+	#i = 0
+
+	#for var in varlist:
+	#	users.append( (varlist[i].iid[config.getint('snmp', 'sub'):], response[i]) )
+	#	i += 1
+
+
+	# very, very dirty one! JUST FOR NOW :(
+	import subprocess, re
+	subp = subprocess.Popen(('snmpwalk', '-v', config.get('snmp', 'version'), '-c', config.get('snmp', 'community'), config.get('snmp', 'query_host'), 'IP-MIB::%s' % config.get('snmp', 'tree')), stdout=subprocess.PIPE)
+	out, err = subp.communicate()
+
+	rgx = re.compile(r'^(.*) = STRING: (.*)$')
 	users = []
-	i = 0
 
-	for var in varlist:
-		users.append( (varlist[i].iid[config.getint('snmp', 'sub'):], response[i]) )
-		i += 1
+	for entry in out.split('\n'):
+		mtch = rgx.match(entry[config.getint('snmp', 'sub'):])
+
+		if not mtch:
+			continue
+
+		mac = []
+
+		for z in mtch.group(2).split(':'):
+			if len(z) < 2:
+				z = '0%s' % z
+
+			mac.append(z)
+
+		mac = ':'.join(mac)
+
+		print mtch.group(1), mac
+
+		mac = mac_to_binary(mac)
+
+		users.append((mtch.group(1), mac))
 
 	return users
 
@@ -95,7 +128,7 @@ class who_is:
 				db.query('UPDATE whois_devices SET last_seen = strftime(\'%s\',\'now\') WHERE mac_addr IN $mac_list', vars=
 					{'mac_list': query_for})
 
-				results = db.query('SELECT display_name FROM whois_users WHERE id IN (SELECT user_id FROM whois_devices WHERE mac_addr IN ($macs))', vars=
+				results = db.query('SELECT display_name FROM whois_users WHERE id IN (SELECT user_id FROM whois_devices WHERE mac_addr IN $macs)', vars=
 					{'macs': query_for})
 
 				for user in results:
@@ -231,7 +264,6 @@ class user_edit_profile:
 			f.validators.append( unique_display_name_validator )
 			f.display_name.validators = [display_name_validator]
 
-
 		if not f.validates():
 			return render.editprofile(f)
 
@@ -245,7 +277,6 @@ class user_edit_profile:
 
 		if len(data_to_change.keys()) > 2: # if changing anything
 			db.update('whois_users', **data_to_change)
-
 
 		raise web.seeother('/panel')
 
