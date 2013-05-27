@@ -139,7 +139,7 @@ class who_is:
 				for user in results:
 					users.add(user['display_name'])
 
-			who_is.last_seen_updated = int(time.time()) + 60*10
+			who_is.last_seen_updated = int(time.time()) + 60*1
 			who_is.total_devices_count = len(query_for)
 			who_is.last_seen_list = list(users)
 
