@@ -97,34 +97,56 @@ def get_current_users():
 
 
 	# very, very dirty one! JUST FOR NOW :(
-	import subprocess, re
-	subp = subprocess.Popen(('snmpwalk', '-v', config.get('snmp', 'version'), '-c', config.get('snmp', 'community'), config.get('snmp', 'query_host'), 'IP-MIB::%s' % config.get('snmp', 'tree')), stdout=subprocess.PIPE)
-	out, err = subp.communicate()
+	# import subprocess, re
+	# subp = subprocess.Popen(('snmpwalk', '-v', config.get('snmp', 'version'), '-c', config.get('snmp', 'community'), config.get('snmp', 'query_host'), 'IP-MIB::%s' % config.get('snmp', 'tree')), stdout=subprocess.PIPE)
+	# out, err = subp.communicate()
 
-	rgx = re.compile(r'^(.*) = STRING: (.*)$')
+	# rgx = re.compile(r'^(.*) = STRING: (.*)$')
+	# users = []
+
+	# for entry in out.split('\n'):
+	# 	mtch = rgx.match(entry[config.getint('snmp', 'sub'):])
+
+	# 	if not mtch:
+	# 		continue
+
+	# 	mac = []
+
+	# 	for z in mtch.group(2).split(':'):
+	# 		if len(z) < 2:
+	# 			z = '0%s' % z
+
+	# 		mac.append(z)
+
+	# 	mac = ':'.join(mac)
+
+	# 	print mtch.group(1), mac
+
+	# 	mac = mac_to_binary(mac)
+
+	# 	users.append((mtch.group(1), mac))
+
+	# we will just parse Access Point Web Interface... (as it was planned long long long time ago)
+	# next version will take this info from local DHCP server 
+	import urllib2, re
+
+	# well... we could just do it once... but... who cares
+	passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
+	passman.add_password(None, config.get('webinterface', 'url'), config.get('webinterface', 'login'), config.get('webinterface', 'password'))
+	authhandler = urllib2.HTTPBasicAuthHandler(passman)
+	opener = urllib2.build_opener(authhandler)
+	urllib2.install_opener(opener)
+
+	conn = urllib2.urlopen(config.get('webinterface', 'url'), timeout=5)
+	data = conn.read()
+
+	matches = re.findall(r'<tr align=middle bgColor=#cccccc><td><FONT face=Arial size=2>(.{17})</FONT></td> <td><FONT face=Arial size=2>([^\s]*) </FONT></td> <td><FONT face=Arial size=2>(\d\d:\d\d:\d\d) </FONT></td>', data)
+
 	users = []
 
-	for entry in out.split('\n'):
-		mtch = rgx.match(entry[config.getint('snmp', 'sub'):])
-
-		if not mtch:
-			continue
-
-		mac = []
-
-		for z in mtch.group(2).split(':'):
-			if len(z) < 2:
-				z = '0%s' % z
-
-			mac.append(z)
-
-		mac = ':'.join(mac)
-
-		print mtch.group(1), mac
-
-		mac = mac_to_binary(mac)
-
-		users.append((mtch.group(1), mac))
+	# MAC, IP, EXPIRE TIME
+	for match in matches:
+		users.append((match[1], mac_to_binary(match[0])))
 
 	return users
 
