@@ -83,7 +83,7 @@ def get_current_users():
 	# final version - parses /var/lib/dhcp/dhcp.leases
 
 	data = ''
-	with file('/var/lib/dhcp/dhcp.leases', 'r') as f:
+	with file(config.get('database', 'leases_file'), 'r') as f:
 		data = f.read()
 
 	matches = re.findall(r'lease ([^\s]*) {\n  starts \d (\d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d);\n  ends \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;[\s\S]*?hardware ethernet (.{17});', data)
