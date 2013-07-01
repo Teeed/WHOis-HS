@@ -26,6 +26,8 @@ import hashlib
 import string
 import random
 import datetime
+import time
+import re
 import ConfigParser
 
 config = ConfigParser.ConfigParser()
@@ -78,29 +80,17 @@ def generate_access_key():
 	return ''.join(random.choice(string.ascii_lowercase + string.ascii_uppercase + string.digits) for x in range(10))
 
 def get_current_users():
-	# we will just parse Access Point Web Interface... (as it was planned long long long time ago)
-	# next version will take this info from local DHCP server 
-	import urllib2, re
+	# final version - parses /var/lib/dhcp/dhcp.leases
 
-	# well... we could just do it once... but... who cares
-	passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
-	passman.add_password(None, config.get('webinterface', 'url'), config.get('webinterface', 'login'), config.get('webinterface', 'password'))
-	authhandler = urllib2.HTTPBasicAuthHandler(passman)
-	opener = urllib2.build_opener(authhandler)
-	urllib2.install_opener(opener)
+	data = ''
+	with file('/var/lib/dhcp/dhcp.leases', 'r') as f:
+		data = f.read()
 
-	conn = urllib2.urlopen(config.get('webinterface', 'url'), timeout=5)
-	data = conn.read()
+	matches = re.findall(r'lease ([^\s]*) {\n  starts \d (\d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d);\n  ends \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;[\s\S]*?hardware ethernet (.{17});', data)
 
-	matches = re.findall(r'<tr align=middle bgColor=#cccccc><td><FONT face=Arial size=2>(.{17})</FONT></td> <td><FONT face=Arial size=2>([^\s]*) </FONT></td> <td><FONT face=Arial size=2>(\d\d:\d\d:\d\d) </FONT></td>', data)
+	utcnow = datetime.datetime.utcnow()
 
-	users = []
-
-	# MAC, IP, EXPIRE TIME
-	for match in matches:
-		users.append((match[1], mac_to_binary(match[0])))
-
-	return users
+	return [(ip, mac) for ip, end_date, mac in matches if datetime.datetime.strptime(end_date, "%Y/%m/%d %H:%M:%S") > utcnow]
 
 class who_is:
 	last_seen_updated = 0
@@ -110,29 +100,27 @@ class who_is:
 	def GET(self):
 		web.header('Content-type', 'application/json')
 
-		# TODO: think if it makes any sense to use interval instead of this method..
-		if who_is.last_seen_updated < time.time():
-			dhcp_leases = get_current_users()
-			query_for = [sqlite3.Binary(lease[1]) for lease in dhcp_leases]
-			
-			# no idea why DISTINCT does not work.. we will use set instead of list to prevent duplicates
-			# we will also display number of unregistered devices
-			# TODO: Fix this!
-			users = set([])
+		dhcp_leases = get_current_users()
+		query_for = [sqlite3.Binary(lease[1]) for lease in dhcp_leases]
+		
+		# no idea why DISTINCT does not work.. we will use set instead of list to prevent duplicates
+		# we will also display number of unregistered devices
+		# TODO: Fix this!
+		users = set([])
 
-			if len(dhcp_leases):
-				db.query('UPDATE whois_devices SET last_seen = strftime(\'%s\',\'now\') WHERE mac_addr IN $mac_list', vars=
-					{'mac_list': query_for})
+		if len(dhcp_leases):
+			db.query('UPDATE whois_devices SET last_seen = strftime(\'%s\',\'now\') WHERE mac_addr IN $mac_list', vars=
+				{'mac_list': query_for})
 
-				results = db.query('SELECT DISTINCT display_name FROM whois_users WHERE id IN (SELECT user_id FROM whois_devices WHERE mac_addr IN $macs)', vars=
-					{'macs': query_for})
+			results = db.query('SELECT DISTINCT display_name FROM whois_users WHERE id IN (SELECT user_id FROM whois_devices WHERE mac_addr IN $macs)', vars=
+				{'macs': query_for})
 
-				for user in results:
-					users.add(user['display_name'])
+			for user in results:
+				users.add(user['display_name'])
 
-			who_is.last_seen_updated = int(time.time()) + 60*1
-			who_is.total_devices_count = len(query_for)
-			who_is.last_seen_list = list(users)
+		who_is.last_seen_updated = int(time.time()) + 60*1
+		who_is.total_devices_count = len(query_for)
+		who_is.last_seen_list = list(users)
 
 		return json.dumps({'date': who_is.last_seen_updated, 'users': who_is.last_seen_list, 'total_devices_count': who_is.total_devices_count})
         
