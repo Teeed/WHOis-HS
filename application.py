@@ -90,7 +90,7 @@ def get_current_users():
 
 	utcnow = datetime.datetime.utcnow()
 
-	return [(ip, mac) for ip, end_date, mac in matches if datetime.datetime.strptime(end_date, "%Y/%m/%d %H:%M:%S") > utcnow]
+	return [(ip, mac_to_binary(mac)) for ip, end_date, mac in matches if datetime.datetime.strptime(end_date, "%Y/%m/%d %H:%M:%S") > utcnow]
 
 class who_is:
 	last_seen_updated = 0
