@@ -86,7 +86,7 @@ def get_current_users():
 	with file(config.get('database', 'leases_file'), 'r') as f:
 		data = f.read()
 
-	matches = re.findall(r'lease ([^\s]*) {\n  starts \d (\d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d);\n  ends \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;[\s\S]*?hardware ethernet (.{17});', data)
+	matches = re.findall(r'lease ([^\s]*) {\n  starts \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  ends \d (\d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d);[\s\S]*?hardware ethernet (.{17});', data)
 
 	utcnow = datetime.datetime.utcnow()
 
