@@ -106,13 +106,13 @@ def get_current_users():
 		if line.startswith('lease '):
 			ipnow = line[6:-2]
 			inblock = True
-		else if inblock:
+		elif inblock:
 			if line[0] == '}':
 				matches.append( (ipnow, mac_to_binary(macaddr)) )
 				inblock = False
-			else if line.startswith('binding state free'): # skip entry
+			elif line.startswith('binding state free'): # skip entry
 				inblock = False
-			else if line.startswith('hardware ethernet'):
+			elif line.startswith('hardware ethernet'):
 				macaddr = line[18:-1]
 
 	return matches
