@@ -155,7 +155,7 @@ class ClientMonitor(object):
 	def update_data(self, users_now):
 		users_now_ids = set(users_now.keys())
 
-		current_timestamp = time.time()
+		current_timestamp = int(time.time())
 
 		new_users = users_now_ids - self._lastUsersSet
 		for user_id in new_users:
