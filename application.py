@@ -17,6 +17,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from web import form
+from threading import Timer
 import web
 import json
 import binascii
@@ -92,6 +93,64 @@ def get_current_users():
 
 	return [(ip, mac_to_binary(mac)) for ip, end_date, mac in matches if datetime.datetime.strptime(end_date, "%Y/%m/%d %H:%M:%S") > utcnow]
 
+# from PEP0318
+def singleton(cls):
+	instances = {}
+	def getinstance():
+		if cls not in instances:
+			instances[cls] = cls()
+		return instances[cls]
+	return getinstance
+
+def get_users_in_hs(current_leases=None):
+	dhcp_leases = get_current_users() if current_leases is None else current_leases
+	query_for = [sqlite3.Binary(lease[1]) for lease in dhcp_leases]
+	users = {}
+
+	if len(dhcp_leases):
+		db.query('UPDATE whois_devices SET last_seen = strftime(\'%s\',\'now\') WHERE mac_addr IN $mac_list', vars=
+			{'mac_list': query_for})
+
+		results = db.query('SELECT DISTINCT id, display_name FROM whois_users WHERE id IN (SELECT user_id FROM whois_devices WHERE mac_addr IN $macs)', vars=
+			{'macs': query_for})
+
+		for user in results:
+			users[user['id']] = user['display_name']
+
+	return users
+
+@singleton
+class ClientMonitor(object):
+	def __init__(self):
+		# mapping USER ID -> FIRST SEEN TIMESTAMP
+		self._lastUsers = {}
+		self._lastUsersSet = set([])
+
+	def update_data(self, users_now):
+		users_now_ids = set(users_now.keys())
+
+		current_timestamp = time.time()
+
+		new_users = users_now_ids - self._lastUsersSet
+		for user_id in new_users:
+				db.query('INSERT INTO whois_history (user_id, from, to) VALUES ($user_id ,$from, 0)', vars={'user_id': user_id, 'from': current_timestamp})
+				self._lastUsers[user_id] = current_timestamp
+
+		users_left = self._lastUsersSet - users_now_ids
+		db.query('UPDATE whois_history WHERE user_id IN $user_ids SET to = $to', vars={'user_ids': list(users_left), 'to': current_timestamp})
+		# we do not need to track them any more
+		for user_id in users_left:
+			del self._lastUsers[user_id]
+
+		self._lastUsersSet = users_now_ids
+
+def timer_update_history():
+	users_now = get_users_in_hs()
+
+	ClientMonitor().update_data(users_now)
+
+	Timer(120, timer_update_history).start()
+
 class who_is:
 	last_seen_updated = 0
 	last_seen_list = []
@@ -101,29 +160,14 @@ class who_is:
 		web.header('Content-type', 'application/json')
 
 		dhcp_leases = get_current_users()
-		query_for = [sqlite3.Binary(lease[1]) for lease in dhcp_leases]
-		
-		# no idea why DISTINCT does not work.. we will use set instead of list to prevent duplicates
-		# we will also display number of unregistered devices
-		# TODO: Fix this!
-		users = set([])
-
-		if len(dhcp_leases):
-			db.query('UPDATE whois_devices SET last_seen = strftime(\'%s\',\'now\') WHERE mac_addr IN $mac_list', vars=
-				{'mac_list': query_for})
-
-			results = db.query('SELECT DISTINCT display_name FROM whois_users WHERE id IN (SELECT user_id FROM whois_devices WHERE mac_addr IN $macs)', vars=
-				{'macs': query_for})
-
-			for user in results:
-				users.add(user['display_name'])
+		users = get_users_in_hs(dhcp_leases).values()
 
 		who_is.last_seen_updated = int(time.time()) + 60*1
-		who_is.total_devices_count = len(query_for)
+		who_is.total_devices_count = len(dhcp_leases)
 		who_is.last_seen_list = list(users)
 
 		return json.dumps({'date': who_is.last_seen_updated, 'users': who_is.last_seen_list, 'total_devices_count': who_is.total_devices_count})
-        
+		
 class register_device:
 	def GET(self, uid, access_key):
 		uid = int(uid)
@@ -350,5 +394,8 @@ class user_logout:
 if __name__ == '__main__':
 	db.query('CREATE TABLE IF NOT EXISTS whois_users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name VARCHAR(100), login VARCHAR(32) UNIQUE, password BLOB(32), access_key VARCHAR(10), registered_at INTEGER, last_login INTEGER)')
 	db.query('CREATE TABLE IF NOT EXISTS whois_devices (mac_addr BLOB(6) PRIMARY KEY UNIQUE, user_id INTEGER, last_seen INTEGER)')
+	db.query('CREATE TABLE IF NOT EXISTS whois_history (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, from INTEGER, to INTEGER)')
+
+	timer_update_history()
 
 	app.run()
