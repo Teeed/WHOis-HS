@@ -159,7 +159,7 @@ class ClientMonitor(object):
 
 		new_users = users_now_ids - self._lastUsersSet
 		for user_id in new_users:
-				db.query('INSERT INTO whois_history (user_id, date_from, date_to) VALUES ($user_id ,$date_from, 0)', vars={'user_id': user_id, 'date_from': current_timestamp})
+				db.query('INSERT INTO whois_history (user_id, date_from, date_to) VALUES ($user_id, $date_from, 0)', vars={'user_id': user_id, 'date_from': current_timestamp})
 				self._lastUsers[user_id] = current_timestamp
 
 		users_left = self._lastUsersSet - users_now_ids
