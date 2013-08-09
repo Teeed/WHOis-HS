@@ -87,11 +87,9 @@ def get_current_users():
 	with file(config.get('database', 'leases_file'), 'r') as f:
 		data = f.read()
 
-	matches = re.findall(r'lease ([^\s]*) {\n  starts \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  ends \d (\d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d);[\s\S]*?hardware ethernet (.{17});', data)
+	matches = re.findall(r'lease ([^\s]*) {\n  starts \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  ends \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  cltt \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  binding state active;[\s\S]*?hardware ethernet (.{17});', data)
 
-	utcnow = datetime.datetime.utcnow()
-
-	return [(ip, mac_to_binary(mac)) for ip, end_date, mac in matches if datetime.datetime.strptime(end_date, "%Y/%m/%d %H:%M:%S") > utcnow]
+	return [(ip, mac_to_binary(mac)) for ip, mac in matches]
 
 # from PEP0318
 def singleton(cls):
