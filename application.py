@@ -93,9 +93,12 @@ def get_current_users():
 	# fuck regexp (which actually works well), lets try to parse it manually (in really ugly way!)
 	ipnow = ''
 	macaddr = ''
+	ends = ''
 	inblock = False
 
 	matches = []
+
+	utcnow = datetime.datetime.utcnow()
 
 	for line in data.split('\n'):
 		line = line.strip()
@@ -110,7 +113,7 @@ def get_current_users():
 			if line[0] == '}':
 				matches.append( (ipnow, mac_to_binary(macaddr)) )
 				inblock = False
-			elif line.startswith('binding state free'): # skip entry
+			elif line.startswith('binding state free') or (line.startswith('ends') and datetime.datetime.strptime(line[7:-1], "%Y/%m/%d %H:%M:%S") < utcnow): # skip entry
 				inblock = False
 			elif line.startswith('hardware ethernet'):
 				macaddr = line[18:-1]
