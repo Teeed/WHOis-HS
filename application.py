@@ -93,7 +93,6 @@ def get_current_users():
 	# fuck regexp (which actually works well), lets try to parse it manually (in really ugly way!)
 	ipnow = ''
 	macaddr = ''
-	ends = ''
 	inblock = False
 
 	matches = []
