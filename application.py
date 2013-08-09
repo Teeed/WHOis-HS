@@ -137,7 +137,7 @@ class ClientMonitor(object):
 				self._lastUsers[user_id] = current_timestamp
 
 		users_left = self._lastUsersSet - users_now_ids
-		db.query('UPDATE whois_history WHERE user_id IN $user_ids SET date_to = $date_to', vars={'user_ids': list(users_left), 'date_to': current_timestamp})
+		db.query('UPDATE whois_history SET date_to = $date_to WHERE user_id IN $user_ids', vars={'user_ids': list(users_left), 'date_to': current_timestamp})
 		# we do not need to track them any more
 		for user_id in users_left:
 			del self._lastUsers[user_id]
