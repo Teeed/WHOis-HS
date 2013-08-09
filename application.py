@@ -133,11 +133,11 @@ class ClientMonitor(object):
 
 		new_users = users_now_ids - self._lastUsersSet
 		for user_id in new_users:
-				db.query('INSERT INTO whois_history (user_id, from, to) VALUES ($user_id ,$from, 0)', vars={'user_id': user_id, 'from': current_timestamp})
+				db.query('INSERT INTO whois_history (user_id, date_from, date_to) VALUES ($user_id ,$date_from, 0)', vars={'user_id': user_id, 'date_from': current_timestamp})
 				self._lastUsers[user_id] = current_timestamp
 
 		users_left = self._lastUsersSet - users_now_ids
-		db.query('UPDATE whois_history WHERE user_id IN $user_ids SET to = $to', vars={'user_ids': list(users_left), 'to': current_timestamp})
+		db.query('UPDATE whois_history WHERE user_id IN $user_ids SET date_to = $date_to', vars={'user_ids': list(users_left), 'date_to': current_timestamp})
 		# we do not need to track them any more
 		for user_id in users_left:
 			del self._lastUsers[user_id]
@@ -394,7 +394,7 @@ class user_logout:
 if __name__ == '__main__':
 	db.query('CREATE TABLE IF NOT EXISTS whois_users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name VARCHAR(100), login VARCHAR(32) UNIQUE, password BLOB(32), access_key VARCHAR(10), registered_at INTEGER, last_login INTEGER)')
 	db.query('CREATE TABLE IF NOT EXISTS whois_devices (mac_addr BLOB(6) PRIMARY KEY UNIQUE, user_id INTEGER, last_seen INTEGER)')
-	db.query('CREATE TABLE IF NOT EXISTS whois_history (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, from INTEGER, to INTEGER)')
+	db.query('CREATE TABLE IF NOT EXISTS whois_history (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, date_from INTEGER, date_to INTEGER)')
 
 	timer_update_history()
 
