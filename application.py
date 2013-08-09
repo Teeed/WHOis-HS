@@ -87,9 +87,37 @@ def get_current_users():
 	with file(config.get('database', 'leases_file'), 'r') as f:
 		data = f.read()
 
-	matches = re.findall(r'lease ([^\s]*) {\n  starts \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  ends \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  cltt \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  binding state active;[\s\S]*?hardware ethernet (.{17});', data)
+	# matches = re.findall(r'lease ([^\s]*) {\n  starts \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  ends \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  cltt \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  binding state active;[\s\S]*?hardware ethernet (.{17});', data)
+	# return [(ip, mac_to_binary(mac)) for ip, mac in matches]
 
-	return [(ip, mac_to_binary(mac)) for ip, mac in matches]
+	# fuck regexp, lets try to parse it manually (in really ugly way!)
+	ipnow = ''
+	macaddr = ''
+	inblock = False
+
+	matches = []
+
+	for line in data.split('\n'):
+		line = line.strip()
+
+		if not len(line) or line[0] == '#':
+			continue
+
+		if line.startswith('lease '):
+			ipnow = line[6:-2]
+			inblock = True
+		else if inblock:
+			if line[0] == '}':
+				matches.append( (ipnow, mac_to_binary(macaddr)) )
+				inblock = False
+			else if line.startswith('binding state free'): # skip entry
+				inblock = False
+			else if line.startswith('hardware ethernet'):
+				macaddr = line[18:-1]
+
+	return matches
+
+
 
 # from PEP0318
 def singleton(cls):
