@@ -77,8 +77,8 @@ def hash_password(username, password):
 def generate_access_key():
 	return ''.join(random.choice(string.ascii_lowercase + string.ascii_uppercase + string.digits) for x in range(10))
 
-def decrypt_data_from_server(data):
-	binary_data = base64.b64decode(data)
+def decrypt_data_from_server(data, decode_function=base64.b64decode):
+	binary_data = decode_function(data)
 
 	return json.loads(AES.new(config.get('whois_server', 'key'), AES.MODE_CFB, binary_data[:AES.block_size]).decrypt(binary_data[AES.block_size:]))
 
@@ -169,7 +169,7 @@ class who_is:
 class register_device:
 	def GET(self, encrypted_data):
 		try:
-			data = decrypt_data_from_server(encrypted_data)
+			data = decrypt_data_from_server(encrypted_data, decode_function=base64.urlsafe_b64encode)
 		except:
 			raise web.badrequest()
 
