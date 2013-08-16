@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 # Appplication that monitors users being currently in hackerspace. Running on Raspberry PI.
+# - Main (is responsible for presenting&processing data)
+#
 # Copyright (C) 2013 Tadeusz Magura-Witkowski
 #
 # This program is free software: you can redistribute it and/or modify
@@ -18,6 +20,9 @@
 
 from web import form
 from threading import Timer
+from Crypto.Cipher import AES
+import base64
+import urllib
 import web
 import json
 import binascii
@@ -36,25 +41,17 @@ config.read(('config.cfg', 'localconfig.cfg'))
 
 web.config.debug = config.getboolean('application', 'debug')
 
-def mac_to_binary(mac):
-	return binascii.unhexlify(mac.replace(':', ''))
-
-def binary_to_mac(binary):
-	s = binascii.hexlify(binary)
-	return ':'.join( (s[i:i+2] for i in range(0, len(s), 2)) )
-
 def convert_date_to_fucking_human_readable_format_the_hell_cause_unix_timestamp_is_fucking_bad_for_peoples_eyes(timestamp):
 	return datetime.datetime.fromtimestamp(timestamp).strftime('%d/%m/%Y %H:%M')
 
 db = web.database(dbn='sqlite', db=config.get('database', 'db_file'))
-render = web.template.render('templates', base='base', globals={'binary_to_mac': binary_to_mac,
-	'BASE_URL': config.get('application', 'base_url'),
+render = web.template.render('templates', base='base', globals={'SERVER_URL': config.get('whois_server', 'local_url'),
 	'date': convert_date_to_fucking_human_readable_format_the_hell_cause_unix_timestamp_is_fucking_bad_for_peoples_eyes,})
 
 urls = (
 	'/', 'index',
 	'/whois', 'who_is',
-	r'^/r/(\d+)/(.{10})$', 'register_device',
+	r'^/register_device/(.*)$', 'register_device',
 	'/register', 'register_user',
 	'/panel', 'user_panel',
 	'/logout', 'user_logout',
@@ -73,51 +70,23 @@ else:
 def hash_password(username, password):
 	hash = '%s%s%s' % (username, password, config.get('application', 'hash_secret'))
 	for i in range(20):
-		hash = hashlib.sha256(hash).digest()
+		hash = hashlib.sha256(hash).hexdigest()
 
 	return hash
 
 def generate_access_key():
 	return ''.join(random.choice(string.ascii_lowercase + string.ascii_uppercase + string.digits) for x in range(10))
 
-def get_current_users():
-	# final version - parses /var/lib/dhcp/dhcp.leases
+def decrypt_data_from_server(data):
+	binary_data = base64.b64decode(data)
 
-	data = ''
-	with file(config.get('database', 'leases_file'), 'r') as f:
-		data = f.read()
+	return json.loads(AES.new(config.get('whois_server', 'key'), AES.MODE_CFB, binary_data[:AES.block_size]).decrypt(binary_data[AES.block_size:]))
 
-	# matches = re.findall(r'lease ([^\s]*) {\n  starts \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  ends \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  cltt \d \d\d\d\d/\d\d/\d\d \d\d:\d\d:\d\d;\n  binding state active;[\s\S]*?hardware ethernet (.{17});', data)
-	# return [(ip, mac_to_binary(mac)) for ip, mac in matches]
-
-	# fuck regexp (which actually works well), lets try to parse it manually (in really ugly way!)
-	ipnow = ''
-	macaddr = ''
-	inblock = False
-
-	matches = []
-
-	utcnow = datetime.datetime.utcnow()
-
-	for line in data.split('\n'):
-		line = line.strip()
-
-		if not len(line) or line[0] == '#':
-			continue
-
-		if line.startswith('lease '):
-			ipnow = line[6:-2]
-			inblock = True
-		elif inblock:
-			if line[0] == '}':
-				matches.append( (ipnow, mac_to_binary(macaddr)) )
-				inblock = False
-			elif line.startswith('binding state free') or (line.startswith('ends') and datetime.datetime.strptime(line[7:-1], "%Y/%m/%d %H:%M:%S") < utcnow): # skip entry
-				inblock = False
-			elif line.startswith('hardware ethernet'):
-				macaddr = line[18:-1]
-
-	return matches
+def get_current_dhcp_leases():
+	# gets current dhcp_leases from whois_server
+	data = urllib.urlopen(config.get('whois_server', 'url')).read()
+	
+	return decrypt_data_from_server(data)
 
 # from PEP0318
 def singleton(cls):
@@ -129,8 +98,8 @@ def singleton(cls):
 	return getinstance
 
 def get_users_in_hs(current_leases=None):
-	dhcp_leases = get_current_users() if current_leases is None else current_leases
-	query_for = [sqlite3.Binary(lease[1]) for lease in dhcp_leases]
+	dhcp_leases = get_current_dhcp_leases() if current_leases is None else current_leases
+	query_for = [lease[1] for lease in dhcp_leases]
 	users = {}
 
 	if len(dhcp_leases):
@@ -166,7 +135,7 @@ class ClientMonitor(object):
 
 		users_left = self._lastUsersSet - users_now_ids
 		if len(users_left):
-			db.query('UPDATE whois_history SET date_to = $date_to WHERE user_id IN $user_ids AND date_to == 0', vars={'user_ids': list(users_left), 'date_to': current_timestamp})
+			db.query('UPDATE whois_history SET date_to = $date_to WHERE date_to == 0 AND user_id IN $user_ids', vars={'user_ids': list(users_left), 'date_to': current_timestamp})
 		# we do not need to track them any more
 		for user_id in users_left:
 			del self._lastUsers[user_id]
@@ -188,7 +157,7 @@ class who_is:
 	def GET(self):
 		web.header('Content-type', 'application/json')
 
-		dhcp_leases = get_current_users()
+		dhcp_leases = get_current_dhcp_leases()
 		users = get_users_in_hs(dhcp_leases).values()
 
 		who_is.last_seen_updated = int(time.time()) + 60*1
@@ -198,33 +167,25 @@ class who_is:
 		return json.dumps({'date': who_is.last_seen_updated, 'users': who_is.last_seen_list, 'total_devices_count': who_is.total_devices_count})
 		
 class register_device:
-	def GET(self, uid, access_key):
-		uid = int(uid)
+	def GET(self, encrypted_data):
+		try:
+			data = decrypt_data_from_server(encrypted_data)
+		except:
+			raise web.badrequest()
+
+		uid, access_key, user_mac = data
 
 		result = db.query('SELECT * FROM whois_users WHERE id == $uid AND access_key == $access_key', vars={'uid': uid, 'access_key': access_key})
 		
 		if not result:
 			raise web.badrequest(u'Zły uid lub access_key. Sprawdź czy wszedłeś pod poprawy adres URL. Jeżeli tak, to pamiętaj, że przy każdym logowaniu Twój adres jest generowany na nowo. Spróbuj zatem zalogować się ponownie i użyć nowego adresu.')
 
-		user_ip = web.ctx.env.get('REMOTE_ADDR')
-		user_mac = None
-		dhcp_leases = get_current_users()
-
-		for lease in dhcp_leases:
-			if lease[0] == user_ip:
-				user_mac = lease[1]
-
-				break
-
-		if not user_mac:
-			raise web.badrequest(u'Czy jesteś pewien, że korzystasz z HS-owego WIFI? Jeżeli tak, to powiadom kogoś o tym błędzie!')
-
-		result = db.query('SELECT * FROM whois_devices WHERE mac_addr == $mac_addr', vars={'mac_addr': sqlite3.Binary(user_mac)})
+		result = db.query('SELECT * FROM whois_devices WHERE mac_addr == $mac_addr', vars={'mac_addr': user_mac})
 
 		if result:
 			raise web.badrequest(u'Twoje urządzenie jest już zarejestrowane!')
 
-		db.insert('whois_devices', mac_addr=sqlite3.Binary(user_mac), user_id=uid, last_seen=int(time.time()))
+		db.insert('whois_devices', mac_addr=user_mac, user_id=uid, last_seen=int(time.time()))
 
 		return u'Brawo! Właśnie dokonałeś rejestracji swojego urządzenia w systemie :) Od tej chwili jego obecność będzie oznaczało również Twoją.'
 
@@ -261,7 +222,7 @@ class register_user:
 			data = f.d
 			del data['password2']
 			del data['submit']
-			data['password'] = sqlite3.Binary(hash_password(data['login'], data['password']))
+			data['password'] = hash_password(data['login'], data['password'])
 			data['registered_at'] = int(time.time())
 			data['access_key'] = generate_access_key()
 
@@ -307,11 +268,10 @@ class user_edit_profile:
 			return render.editprofile(f)
 
 		if f.d['password']:
-
 			userrow = get_userrow()
 
 			def check_old_password(i):
-				return hash_password(userrow['login'], i) == bytes(userrow['password'])
+				return hash_password(userrow['login'], i) == userrow['password']
 
 			check_password_validator = form.Validator('is invalid', check_old_password)
 
@@ -329,7 +289,7 @@ class user_edit_profile:
 		data_to_change = {'where': 'id = $id', 'vars': {'id': session.user_id}}
 
 		if f.d['password']: # changing password
-			data_to_change['password'] = sqlite3.Binary(hash_password(userrow['login'], f.d.password))
+			data_to_change['password'] = hash_password(userrow['login'], f.d.password)
 
 		if f.d['display_name']: # changing display name
 			data_to_change['display_name'] = f.d['display_name']
@@ -370,7 +330,7 @@ class user_panel:
 			return render.login(f)
 
 		result = db.query('SELECT id FROM whois_users WHERE login == $login AND password == $password', 
-			vars={'login': f.d.login, 'password': sqlite3.Binary(hash_password(f.d.login, f.d.password))})
+			vars={'login': f.d.login, 'password': hash_password(f.d.login, f.d.password)})
 
 		try:
 			uid = result[0]['id']
@@ -387,16 +347,13 @@ class user_panel:
 		raise web.seeother('/panel')
 
 class user_remove_device:
-	def GET(self, device_mac):
+	def GET(self, mac_addr):
 		if not session.user_id:
 			raise web.seeother('/panel')
 
 		try:
-			mac_addr = sqlite3.Binary(mac_to_binary(device_mac))
-
 			devicerow = db.query('SELECT * FROM whois_devices WHERE mac_addr = $mac_addr', vars=
 				{'mac_addr': mac_addr})[0]
-
 
 			if devicerow.user_id != session.user_id:
 				raise web.badrequest(u'To urządzenie nie jest Twoje!')
@@ -421,8 +378,8 @@ class user_logout:
 		raise web.seeother('/panel')
 
 if __name__ == '__main__':
-	db.query('CREATE TABLE IF NOT EXISTS whois_users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name VARCHAR(100), login VARCHAR(32) UNIQUE, password BLOB(32), access_key VARCHAR(10), registered_at INTEGER, last_login INTEGER)')
-	db.query('CREATE TABLE IF NOT EXISTS whois_devices (mac_addr BLOB(6) PRIMARY KEY UNIQUE, user_id INTEGER, last_seen INTEGER)')
+	db.query('CREATE TABLE IF NOT EXISTS whois_users (id INTEGER PRIMARY KEY AUTOINCREMENT, display_name VARCHAR(100), login VARCHAR(32) UNIQUE, password VARCHAR(64), access_key VARCHAR(10), registered_at INTEGER, last_login INTEGER)')
+	db.query('CREATE TABLE IF NOT EXISTS whois_devices (mac_addr VARCHAR(17) PRIMARY KEY UNIQUE, user_id INTEGER, last_seen INTEGER)')
 	db.query('CREATE TABLE IF NOT EXISTS whois_history (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, date_from INTEGER, date_to INTEGER)')
 
 	timer_update_history()

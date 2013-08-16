@@ -7,16 +7,16 @@ Cześć $userrow['display_name']! Może chcesz <a href="/panel/editprofile">zmie
 $if devices:
 	Twoje urządzenia:<br/>
 	$for device in devices:
-		$binary_to_mac(device['mac_addr']) [ostatnio widziane $date(device['last_seen'])] <a href="/panel/removedevice/$binary_to_mac(device['mac_addr'])" onclick="return confirm('Czy jesteś pewien że chcesz usunąć to urządzenie?')">usuń</a><br/>
+		$device['mac_addr'] [ostatnio widziane $date(device['last_seen'])] <a href="/panel/removedevice/$device['mac_addr']" onclick="return confirm('Czy jesteś pewien że chcesz usunąć to urządzenie?')">usuń</a><br/>
 $else:
 	Nie masz żadnych urządzeń :&lt; <br/>
 
 
-<br/><br/>Wejdź na ten adres z urządzenia które chcesz zarejestrować aby połączyć je z Twoim kontem: <a href="$BASE_URL/r/$userrow['id']/$userrow['access_key']">$BASE_URL/r/$userrow['id']/$userrow['access_key']</a>
+<br/><br/>Wejdź na ten adres z urządzenia które chcesz zarejestrować aby połączyć je z Twoim kontem: <a href="$SERVER_URL/r/$userrow['id']/$userrow['access_key']">$SERVER_URL/r/$userrow['id']/$userrow['access_key']</a>
 <div id="qrcode"></div>
 <script type="text/javascript">
 $$(document).ready(function(){
-	$$('#qrcode').qrcode("$BASE_URL/r/$userrow['id']/$userrow['access_key']");
+	$$('#qrcode').qrcode("$SERVER_URL/r/$userrow['id']/$userrow['access_key']");
 
 });
 </script>
