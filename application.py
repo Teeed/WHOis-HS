@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-# Appplication that monitors users being currently in hackerspace. Running on Raspberry PI.
-# - Main (is responsible for presenting&processing data)
+# Appplication that monitors users being currently in hackerspace.
+# - Main app (is responsible for presenting&processing data)
 #
 # Copyright (C) 2013 Tadeusz Magura-Witkowski
 #

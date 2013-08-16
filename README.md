@@ -1,7 +1,8 @@
 WHOis @ HS
 ========
 
-Appplication that monitors users being currently in hackerspace. Running on Raspberry PI.
+Appplication that monitors users being currently in hackerspace.
+Main app (is responsible for presenting&processing data)
 
 =======
 
