@@ -169,7 +169,7 @@ class who_is:
 class register_device:
 	def GET(self, encrypted_data):
 		try:
-			data = decrypt_data_from_server(encrypted_data, decode_function=base64.urlsafe_b64encode)
+			data = decrypt_data_from_server(encrypted_data, decode_function=base64.urlsafe_b64decode)
 		except:
 			raise web.badrequest()
 
