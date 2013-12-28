@@ -143,11 +143,14 @@ class ClientMonitor(object):
 		self._lastUsersSet = users_now_ids
 
 def timer_update_history():
-	users_now = get_users_in_hs()
+	try:
+		users_now = get_users_in_hs()
 
-	ClientMonitor().update_data(users_now)
-
-	Timer(120, timer_update_history).start()
+		ClientMonitor().update_data(users_now)
+	except:
+		Timer(10, timer_update_history).start()
+	else:
+		Timer(120, timer_update_history).start()
 
 class who_is:
 	last_seen_updated = 0
