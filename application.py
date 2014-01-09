@@ -41,7 +41,7 @@ config.read(('config.cfg', 'localconfig.cfg'))
 
 if config.getboolean('application', 'zmq_enabled'):
 	import zmq
-
+	from zmq_server import ZMQ_MESSAGE_USER_INITIAL, ZMQ_MESSAGE_USER_IN, ZMQ_MESSAGE_USER_OUT
 
 web.config.debug = config.getboolean('application', 'debug')
 
@@ -150,38 +150,18 @@ class ClientMonitor(object):
 			del self._lastUsers[user_id]
 
 		if self._zmq_context:
-			self.notify_zmq(users_left, new_users)
+			self.notify_zmq(users_now)
 
 		self._lastUsersSet = users_now_ids
 
-	def notify_zmq(self, users_left, new_users):
+	def notify_zmq(self, users_now):
 		print 'zmq_start'
-		request_ids = list(users_left | new_users)
-
-		if not len(request_ids):
-			return
-
-		user_map = {}
-
-		for row in db.query('SELECT id, display_name FROM whois_users WHERE id IN (%s)' % ','.join(map(str, request_ids))):
-			user_map[row.id] = row.display_name
-
-		print user_map
-
-		users_left = {key: value for (key, value) in map(lambda id: (id, user_map.get(id, str(id)) ), users_left)}
-		new_users = {key: value for (key, value) in map(lambda id: (id, user_map.get(id, str(id)) ), new_users)}
 		
-		sender = self._zmq_context.socket(zmq.DEALER)
+		sender = self._zmq_context.socket(zmq.PUB)
 		sender.connect(config.get('application', 'zmq_server_addr'))
 
-		# TODO: MESSSAGE FORMAT IT WILL CHANGE!!!
-		if len(users_left.keys()):
-			message = json.dumps({'type': 'users_out', 'users': users_left})
-			sender.send(message)
-
-		if len(new_users.keys()):
-			message = json.dumps({'type': 'users_in', 'users': new_users})
-			sender.send(message)
+		message = json.dumps(users_now)
+		sender.send("%3d%s" % (ZMQ_MESSAGE_USER_INITIAL, message))
 
 		sender.close()
 		print 'zmq_end'
