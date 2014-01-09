@@ -39,6 +39,10 @@ import ConfigParser
 config = ConfigParser.ConfigParser()
 config.read(('config.cfg', 'localconfig.cfg'))
 
+if config.getboolean('application', 'zmq_enabled'):
+	import zmq
+
+
 web.config.debug = config.getboolean('application', 'debug')
 
 def convert_date_to_fucking_human_readable_format_the_hell_cause_unix_timestamp_is_fucking_bad_for_peoples_eyes(timestamp):
@@ -121,6 +125,11 @@ class ClientMonitor(object):
 		self._lastUsers = {}
 		self._lastUsersSet = set([])
 
+		if config.getboolean('application', 'zmq_enabled'):
+			self._zmq_context = zmq.Context()
+		else:
+			self._zmq_context = None
+
 		db.query('UPDATE whois_history SET date_to = NULL WHERE date_to == 0')
 
 	def update_data(self, users_now):
@@ -140,7 +149,43 @@ class ClientMonitor(object):
 		for user_id in users_left:
 			del self._lastUsers[user_id]
 
+		if self._zmq_context:
+			self.notify_zmq(users_left, new_users)
+
 		self._lastUsersSet = users_now_ids
+
+	def notify_zmq(self, users_left, new_users):
+		print 'zmq_start'
+		request_ids = list(users_left | new_users)
+
+		if not len(request_ids):
+			return
+
+		user_map = {}
+
+		for row in db.query('SELECT id, display_name FROM whois_users WHERE id IN (%s)' % ','.join(map(str, request_ids))):
+			user_map[row.id] = row.display_name
+
+		print user_map
+
+		users_left = {key: value for (key, value) in map(lambda id: (id, user_map.get(id, str(id)) ), users_left)}
+		new_users = {key: value for (key, value) in map(lambda id: (id, user_map.get(id, str(id)) ), new_users)}
+		
+		sender = self._zmq_context.socket(zmq.DEALER)
+		sender.connect(config.get('application', 'zmq_server_addr'))
+
+		# TODO: MESSSAGE FORMAT IT WILL CHANGE!!!
+		if len(users_left.keys()):
+			message = json.dumps({'type': 'users_out', 'users': users_left})
+			sender.send(message)
+
+		if len(new_users.keys()):
+			message = json.dumps({'type': 'users_in', 'users': new_users})
+			sender.send(message)
+
+		sender.close()
+		print 'zmq_end'
+
 
 def timer_update_history():
 	try:
@@ -385,6 +430,6 @@ if __name__ == '__main__':
 	db.query('CREATE TABLE IF NOT EXISTS whois_devices (mac_addr VARCHAR(17) PRIMARY KEY UNIQUE, user_id INTEGER, last_seen INTEGER)')
 	db.query('CREATE TABLE IF NOT EXISTS whois_history (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, date_from INTEGER, date_to INTEGER)')
 
-	timer_update_history()
+	Timer(10, timer_update_history).start()
 
 	app.run()
