@@ -57,12 +57,14 @@ def main():
 
 			users_in = users_ids_now - last_users_ids
 			if len(users_in):
-				new_users = {key:value for (key, value) in users.iteritems() if key in users_in}
+				new_users = dict((key, value) for (key, value) in users.iteritems() if key in users_in)
+				# new_users = {key:value for (key, value) in users.iteritems() if key in users_in}
 				socket_out.send("%3d%s" % (ZMQ_MESSAGE_USER_IN, json.dumps( new_users )))
 
 			users_out = last_users_ids - users_ids_now
 			if len(users_out):
-				users_left = {key:value for (key, value) in last_users.iteritems() if key in users_out}
+				users_left = dict((key, value) for (key, value) in last_users.iteritems() if key in users_out)
+				# users_left = {key:value for (key, value) in last_users.iteritems() if key in users_out}
 				socket_out.send("%3d%s" % (ZMQ_MESSAGE_USER_OUT, json.dumps( users_left )))
 
 			last_users = users
