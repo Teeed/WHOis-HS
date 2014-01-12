@@ -2,21 +2,45 @@ $def with (userrow, devices)
 
 <script type="text/javascript" src="/static/panel.js"></script>
 
-Cześć $userrow['display_name']! Może chcesz <a href="/panel/editprofile">zmienić swoje hasło/swoje dane</a>? Zawsze pamiętaj o <A href="/logout">wylogowywaniu się</a><br/> <br/>
+<div class="container">
+				<div class="row welcome text-center">
+					<div class="span12">
+						<p class="lead">Panel użytkownika</p>
+					</div>
+				</div>
+					<hr>
 
-$if devices:
-	Twoje urządzenia:<br/>
-	$for device in devices:
-		$device['mac_addr'] [ostatnio widziane $date(device['last_seen'])] <a href="/panel/removedevice/$device['mac_addr']" onclick="return confirm('Czy jesteś pewien że chcesz usunąć to urządzenie?')">usuń</a><br/>
-$else:
-	Nie masz żadnych urządzeń :&lt; <br/>
+				<div class="row">
+					<div class="span12 text-center">
+					
+						<h3>
+Cześć $userrow['display_name']! Może chcesz <a href="/panel/editprofile">zmienić swoje hasło/swoje dane</a>? Zawsze pamiętaj o <A href="/logout">wylogowywaniu się</a>
+						</h3>
+						<br/> <br/>
 
+					</div>
 
-<br/><br/>Wejdź na ten adres z urządzenia które chcesz zarejestrować aby połączyć je z Twoim kontem: <a href="$SERVER_URL/r/$userrow['id']/$userrow['access_key']">$SERVER_URL/r/$userrow['id']/$userrow['access_key']</a>
+					<div class="span6">
+						$if devices:
+							<h3>Twoje urządzenia:</h3><br/>
+							$for device in devices:
+								$device['mac_addr'] [ostatnio widziane $date(device['last_seen'])] <a href="/panel/removedevice/$device['mac_addr']" onclick="return confirm('Czy jesteś pewien że chcesz usunąć to urządzenie?')">usuń</a><br/>
+						$else:
+							<h3>Nie masz żadnych urządzeń :&lt;</h3><br/>
+					</div>
+					<div class="span6">
+<h3>Dodaj nowe urządzenie</h3>
+</br>
+Wejdź na ten adres z urządzenia które chcesz zarejestrować aby połączyć je z Twoim kontem: <a href="$SERVER_URL/r/$userrow['id']/$userrow['access_key']">$SERVER_URL/r/$userrow['id']/$userrow['access_key']</a>
+</hr>
+</br></br>
 <div id="qrcode"></div>
 <script type="text/javascript">
 $$(document).ready(function(){
 	$$('#qrcode').qrcode("$SERVER_URL/r/$userrow['id']/$userrow['access_key']");
 
-});
-</script>
+						});
+						</script>
+					</div>
+				</div>
+</div>
