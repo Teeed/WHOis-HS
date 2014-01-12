@@ -21,12 +21,12 @@ Cześć $userrow['display_name']! Może chcesz <a href="/panel/editprofile">zmie
 					</div>
 
 					<div class="span6">
-$if devices:
-	Twoje urządzenia:<br/>
-	$for device in devices:
-		$device['mac_addr'] [ostatnio widziane $date(device['last_seen'])] <a href="/panel/removedevice/$device['mac_addr']" onclick="return confirm('Czy jesteś pewien że chcesz usunąć to urządzenie?')">usuń</a><br/>
-$else:
-	Nie masz żadnych urządzeń :&lt; <br/>
+						$if devices:
+							Twoje urządzenia:<br/>
+							$for device in devices:
+								$device['mac_addr'] [ostatnio widziane $date(device['last_seen'])] <a href="/panel/removedevice/$device['mac_addr']" onclick="return confirm('Czy jesteś pewien że chcesz usunąć to urządzenie?')">usuń</a><br/>
+						$else:
+							Nie masz żadnych urządzeń :&lt; <br/>
 					</div>
 					<div class="span6">
 <br/><br/>Wejdź na ten adres z urządzenia które chcesz zarejestrować aby połączyć je z Twoim kontem: <a href="$SERVER_URL/r/$userrow['id']/$userrow['access_key']">$SERVER_URL/r/$userrow['id']/$userrow['access_key']</a>
