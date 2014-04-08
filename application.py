@@ -89,7 +89,7 @@ def decrypt_data_from_server(data, decode_function=base64.b64decode):
 def get_current_dhcp_leases():
 	# gets current dhcp_leases from whois_server
 	data = urllib.urlopen(config.get('whois_server', 'url')).read()
-	
+
 	return decrypt_data_from_server(data)
 
 # from PEP0318
@@ -117,6 +117,19 @@ def get_users_in_hs(current_leases=None):
 			users[user['id']] = user['display_name']
 
 	return users
+
+def get_unknown_macs(current_leases=None):
+    dhcp_leases = get_current_dhcp_leases() if current_leases is None else current_leases
+    query_for = [lease[1] for lease in dhcp_leases]
+
+    if len(dhcp_leases):
+	results = db.query('SELECT mac_addr FROM whois_devices WHERE mac_addr IN $macs', vars=
+	    {'macs': query_for})
+
+	for mac in results:
+	    query_for.remove(mac['mac_addr'])
+
+    return query_for
 
 @singleton
 class ClientMonitor(object):
@@ -156,7 +169,7 @@ class ClientMonitor(object):
 
 	def notify_zmq(self, users_now):
 		print 'zmq_start'
-		
+
 		sender = self._zmq_context.socket(zmq.PUB)
 		sender.connect(config.get('application', 'zmq_server_addr'))
 
@@ -187,13 +200,18 @@ class who_is:
 
 		dhcp_leases = get_current_dhcp_leases()
 		users = get_users_in_hs(dhcp_leases).values()
+		unknown_macs = get_unknown_macs(dhcp_leases)
 
 		who_is.last_seen_updated = int(time.time()) + 60*1
 		who_is.total_devices_count = len(dhcp_leases)
 		who_is.last_seen_list = list(users)
+		who_is.unknown_macs_count = len(unknown_macs)
 
-		return json.dumps({'date': who_is.last_seen_updated, 'users': who_is.last_seen_list, 'total_devices_count': who_is.total_devices_count})
-		
+		return json.dumps({'date': who_is.last_seen_updated,
+		                   'users': who_is.last_seen_list,
+		                   'total_devices_count': who_is.total_devices_count,
+		                   'unknown_devices_count': who_is.unknown_macs_count})
+
 class register_device:
 	def GET(self, encrypted_data):
 		try:
@@ -204,7 +222,7 @@ class register_device:
 		uid, access_key, user_mac = data
 
 		result = db.query('SELECT * FROM whois_users WHERE id == $uid AND access_key == $access_key', vars={'uid': uid, 'access_key': access_key})
-		
+
 		if not result:
 			raise web.badrequest(u'Zły uid lub access_key. Sprawdź czy wszedłeś pod poprawy adres URL. Jeżeli tak, to pamiętaj, że przy każdym logowaniu Twój adres jest generowany na nowo. Spróbuj zatem zalogować się ponownie i użyć nowego adresu.')
 
@@ -219,10 +237,10 @@ class register_device:
 
 password_validator = form.regexp(r'.{3,100}$', u'od 3 do 100 znaków')
 display_name_validator = form.regexp(r'.{3,100}$', u'od 3 do 100 znaków')
-unique_username_validator = form.Validator(u'Podana nazwa użytkownika jest już zajęta', lambda f: 
+unique_username_validator = form.Validator(u'Podana nazwa użytkownika jest już zajęta', lambda f:
 						db.query('SELECT COUNT(id) AS cnt FROM whois_users WHERE login == $login', vars={'login': f.login})[0]['cnt'] == 0)
 password_match_validator = form.Validator(u'Hasła w dwóch polach się nie zgadzają', lambda i: i.password == i.password2)
-unique_display_name_validator = form.Validator(u'Ktoś już używa takiej nazwy...', lambda f: 
+unique_display_name_validator = form.Validator(u'Ktoś już używa takiej nazwy...', lambda f:
 						db.query('SELECT COUNT(id) AS cnt FROM whois_users WHERE display_name == $display_name', vars={'display_name': f.display_name})[0]['cnt'] == 0)
 login_validator = form.regexp(r'[a-zA-Z0-9_]{3,32}$', u'od 3 do 32 znaków, alfanumeryczny')
 
@@ -283,7 +301,7 @@ class user_edit_profile:
 			raise web.seeother('/panel')
 
 		f = user_edit_profile.edit_form()
-		
+
 		return render.editprofile(f)
 
 	def POST(self):
@@ -357,7 +375,7 @@ class user_panel:
 			f.password.value = ''
 			return render.login(f)
 
-		result = db.query('SELECT id FROM whois_users WHERE login == $login AND password == $password', 
+		result = db.query('SELECT id FROM whois_users WHERE login == $login AND password == $password',
 			vars={'login': f.d.login, 'password': hash_password(f.d.login, f.d.password)})
 
 		try:
@@ -369,7 +387,7 @@ class user_panel:
 
 		db.query('UPDATE whois_users SET last_login = strftime(\'%s\',\'now\'), access_key = $access_key WHERE id = $id', vars=
 			{'access_key': generate_access_key(), 'id': uid})
-	
+
 		session.user_id = uid
 
 		raise web.seeother('/panel')
