@@ -45,6 +45,7 @@ class User(object):
 		self.last_visit = 0
 		self.total_hourly = {}
 		self.total_monthly = {}
+		self.total_yearly = {}
 		self.total_time = 0
 		self.total_visits = 0
 		self.total_weekly = {}
@@ -118,6 +119,7 @@ class User(object):
 			
 			self.update_weekly(current_date)
 			self.update_monthly(current_date)
+			self.update_yearly(current_date)
 
 			current_date += datetime.timedelta(hours=1)
 
@@ -143,6 +145,11 @@ class User(object):
 
 		self._add_to_array_value('total_monthly', current_month, 1)
 
+	def update_yearly(self, current_timestamp):
+		current_year = current_timestamp.year
+
+		self._add_to_array_value('total_yearly', current_year, 1)
+
 	def update_with_who(self, friends_set):
 		for friend in friends_set:
 			self.with_who[friend] = self.with_who.get(friend, 0) + 1
@@ -165,6 +172,7 @@ class User(object):
 		self._merge_array_value(another_user, 'total_hourly')
 		self._merge_array_value(another_user, 'total_weekly')
 		self._merge_array_value(another_user, 'total_monthly')
+		self._merge_array_value(another_user, 'total_yearly')
 
 		self.update_first_last_visit(another_user.first_visit, another_user.last_visit)
 
