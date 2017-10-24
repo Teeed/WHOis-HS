@@ -45,12 +45,12 @@ if config.getboolean('application', 'zmq_enabled'):
 
 web.config.debug = config.getboolean('application', 'debug')
 
-def convert_date_to_fucking_human_readable_format_the_hell_cause_unix_timestamp_is_fucking_bad_for_peoples_eyes(timestamp):
+def convert_timestamp_to_human(timestamp):
 	return datetime.datetime.fromtimestamp(timestamp).strftime('%d/%m/%Y %H:%M')
 
 db = web.database(dbn='sqlite', db=config.get('database', 'db_file'))
 render = web.template.render('templates', base='base', globals={'SERVER_URL': config.get('whois_server', 'local_url'),
-	'date': convert_date_to_fucking_human_readable_format_the_hell_cause_unix_timestamp_is_fucking_bad_for_peoples_eyes,})
+	'date': convert_timestamp_to_human,})
 
 urls = (
 	'/', 'index',
